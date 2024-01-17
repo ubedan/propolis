@@ -112,7 +112,7 @@ pub(crate) struct DiskFactory {
 
     /// A reference to the artifact store to use to look up guest OS artifacts
     /// when those are used as a disk source.
-    artifact_store: Rc<ArtifactStore>,
+    artifact_store: Arc<ArtifactStore>,
 
     /// The path to the Crucible downstairs binary to launch to serve Crucible
     /// disks.
@@ -120,7 +120,7 @@ pub(crate) struct DiskFactory {
 
     /// The port allocator to use to allocate ports to Crucible server
     /// processes.
-    port_allocator: Rc<PortAllocator>,
+    port_allocator: Arc<PortAllocator>,
 
     /// The logging discipline to use for Crucible server processes.
     log_mode: ServerLogMode,
