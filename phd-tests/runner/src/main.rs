@@ -59,8 +59,6 @@ async fn run_tests(run_opts: &RunOptions) -> ExecutionStats {
     let ctx = Framework::new(ctx_params)
         .expect("should be able to set up a test context");
 
-    let fixtures = TestFixtures::new(&ctx).unwrap();
-
     // Run the tests and print results.
     let execution_stats = execute::run_tests_with_ctx(&ctx, fixtures, run_opts);
     if !execution_stats.failed_test_cases.is_empty() {

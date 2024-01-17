@@ -10,7 +10,6 @@
 
 use std::{
     path::{Path, PathBuf},
-    rc::Rc,
     sync::Arc,
 };
 
@@ -133,9 +132,9 @@ impl DiskFactory {
     /// supplied `artifact_store`.
     pub fn new(
         storage_dir: &impl AsRef<Path>,
-        artifact_store: Rc<ArtifactStore>,
+        artifact_store: Arc<ArtifactStore>,
         crucible_downstairs_binary: Option<&impl AsRef<Path>>,
-        port_allocator: Rc<PortAllocator>,
+        port_allocator: Arc<PortAllocator>,
         log_mode: ServerLogMode,
     ) -> Self {
         Self {
