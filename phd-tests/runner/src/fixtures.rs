@@ -3,20 +3,21 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use anyhow::Result;
+use std::sync::Arc;
 use tracing::instrument;
 
 use crate::Framework;
 
 /// A wrapper containing the objects needed to run the executor's test fixtures.
-pub struct TestFixtures<'a> {
-    test_context: &'a Framework,
+pub struct TestFixtures {
+    test_context: Arc<Framework>,
 }
 
-impl<'a> TestFixtures<'a> {
+impl TestFixtures {
     /// Creates a new set of test fixtures using the supplied command-line
     /// parameters and artifact store.
-    pub fn new(test_context: &'a Framework) -> Result<Self> {
-        Ok(Self { test_context })
+    pub fn new(test_context: &Arc<Framework>) -> Result<Self> {
+        Ok(Self { test_context: test_context.clone() })
     }
 
     /// Calls fixture routines that need to run before any tests run.

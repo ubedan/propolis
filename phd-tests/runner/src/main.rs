@@ -17,7 +17,8 @@ use tracing_subscriber::{EnvFilter, Registry};
 use crate::execute::ExecutionStats;
 use crate::fixtures::TestFixtures;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let runner_args = ProcessArgs::parse();
     set_tracing_subscriber(&runner_args);
 
@@ -41,7 +42,7 @@ fn main() {
     }
 }
 
-fn run_tests(run_opts: &RunOptions) -> ExecutionStats {
+async fn run_tests(run_opts: &RunOptions) -> ExecutionStats {
     let ctx_params = FrameworkParameters {
         propolis_server_path: run_opts.propolis_server_cmd.clone(),
         crucible_downstairs_cmd: run_opts.crucible_downstairs_cmd.clone(),

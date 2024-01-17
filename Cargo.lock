@@ -2990,6 +2990,7 @@ dependencies = [
  "clap 4.4.0",
  "phd-framework",
  "phd-tests",
+ "tokio",
  "tracing",
  "tracing-appender",
  "tracing-bunyan-formatter",

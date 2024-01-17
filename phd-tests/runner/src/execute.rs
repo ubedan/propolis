@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
 use phd_tests::phd_testcase::{Framework, TestCase, TestOutcome};
+use tokio::{sync::mpsc, task::JoinSet};
 use tracing::{error, info};
 
 use crate::config::RunOptions;
@@ -56,9 +57,8 @@ thread_local! {
 }
 
 /// Executes a set of tests using the supplied test context.
-pub fn run_tests_with_ctx(
-    ctx: &Framework,
-    mut fixtures: TestFixtures,
+pub async fn run_tests_with_ctx(
+    ctx: Arc<Framework>,
     run_opts: &RunOptions,
 ) -> ExecutionStats {
     let mut executions = Vec::new();
@@ -97,22 +97,22 @@ pub fn run_tests_with_ctx(
 
     info!("Running {} test(s)", executions.len());
     let start_time = Instant::now();
-    'exec_loop: for execution in &mut executions {
-        info!("Starting test {}", execution.tc.fully_qualified_name());
+    let mut tests = tokio::task::JoinSet::new();
+    for execution in executions {
+        let ctx = ctx.clone();
+        tests.spawn_blocking(move || execution.run(ctx));
+    }
 
-        // Failure to run a setup fixture is fatal to the rest of the run, but
-        // it's still possible to report results, so return gracefully instead
-        // of panicking.
-        if let Err(e) = fixtures.test_setup() {
-            error!("Error running test setup fixture: {}", e);
-            break 'exec_loop;
-        }
+    while let Some(execution) = tests.join_next().await {
+        let execution = match execution {
+            Ok(execution) => execution,
+            Err(e) if e.is_cancelled() => {
+                continue;
+            }
+            Err(e) => panic!("panics in spawned tests should be caught!"),
+        };
 
         stats.tests_not_run -= 1;
-        let test_outcome = std::panic::catch_unwind(|| execution.tc.run(ctx))
-            .unwrap_or_else(|_| {
-                PANIC_MSG.with(|val| TestOutcome::Failed(val.take()))
-            });
 
         info!(
             "test {} ... {}{}",
@@ -139,16 +139,43 @@ pub fn run_tests_with_ctx(
             }
             TestOutcome::Skipped(_) => stats.tests_skipped += 1,
         }
-
-        execution.status = Status::Ran(test_outcome);
-        if let Err(e) = fixtures.test_cleanup() {
-            error!("Error running cleanup fixture: {}", e);
-            break 'exec_loop;
-        }
     }
+    // // Failure to run a setup fixture is fatal to the rest of the run, but
+    // // it's still possible to report results, so return gracefully instead
+    // // of panicking.
+    // if let Err(e) = fixtures.test_setup() {
+    //     error!("Error running test setup fixture: {}", e);
+    //     break 'exec_loop;
+    // }
+
+    // execution.status = Status::Ran(test_outcome);
+    // if let Err(e) = fixtures.test_cleanup() {
+    //     error!("Error running cleanup fixture: {}", e);
+    //     break 'exec_loop;
+    // }
+
     stats.duration = start_time.elapsed();
 
-    fixtures.execution_cleanup().unwrap();
+    // fixtures.execution_cleanup().unwrap();
 
     stats
+}
+
+impl Execution {
+    #[tracing::instrument(
+        level = tracing::Level::INFO,
+        "test",
+        skip(self, ctx),
+        fields(message = %self.tc.fully_qualified_name())
+    )]
+    fn run(self, ctx: Arc<Framework>) -> Execution {
+        info!("Starting test {}", self.tc.fully_qualified_name());
+
+        let test_outcome = std::panic::catch_unwind(|| execution.tc.run(ctx))
+            .unwrap_or_else(|_| {
+                PANIC_MSG.with(|val| TestOutcome::Failed(val.take()))
+            });
+
+        Execution { tc: self.tc, status: Status::Ran(test_outcome) }
+    }
 }

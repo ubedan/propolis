@@ -27,7 +27,7 @@
 //! environment. The `spawn_successor_vm` function provides a shorthand way to
 //! do this.
 
-use std::{ops::Range, rc::Rc};
+use std::{ops::Range, rc::Rc, sync::Arc};
 
 use anyhow::Context;
 use artifacts::DEFAULT_PROPOLIS_ARTIFACT;
@@ -67,9 +67,9 @@ pub struct Framework {
     // self-referencing. Since the runner is single-threaded, avoid arguing with
     // anyone about lifetimes by wrapping the relevant shared components in an
     // `Rc`.
-    pub(crate) artifact_store: Rc<artifacts::ArtifactStore>,
+    pub(crate) artifact_store: Arc<artifacts::ArtifactStore>,
     pub(crate) disk_factory: DiskFactory,
-    pub(crate) port_allocator: Rc<PortAllocator>,
+    pub(crate) port_allocator: Arc<PortAllocator>,
 }
 
 pub struct FrameworkParameters {
@@ -111,8 +111,8 @@ impl Framework {
                 )
             })?;
 
-        let artifact_store = Rc::new(artifact_store);
-        let port_allocator = Rc::new(PortAllocator::new(params.port_range));
+        let artifact_store = Arc::new(artifact_store);
+        let port_allocator = Arc::new(PortAllocator::new(params.port_range));
         let disk_factory = DiskFactory::new(
             &params.tmp_directory,
             artifact_store.clone(),
