@@ -9,6 +9,7 @@ mod fixtures;
 use clap::Parser;
 use config::{ListOptions, ProcessArgs, RunOptions};
 use phd_tests::phd_testcase::{Framework, FrameworkParameters};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 use tracing_bunyan_formatter::{BunyanFormattingLayer, JsonStorageLayer};
 use tracing_subscriber::layer::SubscriberExt;
@@ -17,8 +18,7 @@ use tracing_subscriber::{EnvFilter, Registry};
 use crate::execute::ExecutionStats;
 use crate::fixtures::TestFixtures;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let runner_args = ProcessArgs::parse();
     set_tracing_subscriber(&runner_args);
 
@@ -42,6 +42,7 @@ async fn main() {
     }
 }
 
+#[tokio::main]
 async fn run_tests(run_opts: &RunOptions) -> ExecutionStats {
     let ctx_params = FrameworkParameters {
         propolis_server_path: run_opts.propolis_server_cmd.clone(),
@@ -60,7 +61,8 @@ async fn run_tests(run_opts: &RunOptions) -> ExecutionStats {
         .expect("should be able to set up a test context");
 
     // Run the tests and print results.
-    let execution_stats = execute::run_tests_with_ctx(&ctx, fixtures, run_opts);
+    let execution_stats =
+        execute::run_tests_with_ctx(Arc::new(ctx), run_opts).await;
     if !execution_stats.failed_test_cases.is_empty() {
         println!("\nfailures:");
         for tc in &execution_stats.failed_test_cases {

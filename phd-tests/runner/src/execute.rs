@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 use std::cell::RefCell;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use phd_tests::phd_testcase::{Framework, TestCase, TestOutcome};
@@ -84,7 +85,7 @@ pub async fn run_tests_with_ctx(
         return stats;
     }
 
-    fixtures.execution_setup().unwrap();
+    // fixtures.execution_setup().unwrap();
 
     std::panic::set_hook(Box::new(|info| {
         PANIC_MSG.with(|val| {
@@ -104,12 +105,12 @@ pub async fn run_tests_with_ctx(
     }
 
     while let Some(execution) = tests.join_next().await {
-        let execution = match execution {
-            Ok(execution) => execution,
+        let (execution, test_outcome) = match execution {
+            Ok(ex) => ex,
             Err(e) if e.is_cancelled() => {
                 continue;
             }
-            Err(e) => panic!("panics in spawned tests should be caught!"),
+            Err(e) => panic!("panics in spawned tests should be caught! {e:?}"),
         };
 
         stats.tests_not_run -= 1;
@@ -168,14 +169,14 @@ impl Execution {
         skip(self, ctx),
         fields(message = %self.tc.fully_qualified_name())
     )]
-    fn run(self, ctx: Arc<Framework>) -> Execution {
+    fn run(self, ctx: Arc<Framework>) -> (Execution, TestOutcome) {
         info!("Starting test {}", self.tc.fully_qualified_name());
 
-        let test_outcome = std::panic::catch_unwind(|| execution.tc.run(ctx))
+        let test_outcome = std::panic::catch_unwind(|| self.tc.run(&ctx))
             .unwrap_or_else(|_| {
                 PANIC_MSG.with(|val| TestOutcome::Failed(val.take()))
             });
 
-        Execution { tc: self.tc, status: Status::Ran(test_outcome) }
+        (self, test_outcome)
     }
 }
