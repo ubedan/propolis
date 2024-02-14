@@ -40,18 +40,20 @@ pub enum PinOp {
 }
 
 pub struct LegacyPIC {
-    inner: Mutex<Inner>,
+    inner: Arc<Mutex<Levels>>,
     hdl: Arc<VmmHdl>,
 }
 
-struct Inner {
-    pins: [Entry; PIN_COUNT as usize],
+#[derive(Default)]
+pub(crate) struct Levels {
+    pub(crate) pins: [Entry; PIN_COUNT as usize],
 }
 
 #[derive(Default, Copy, Clone)]
-struct Entry {
-    level: usize,
+pub(crate) struct Entry {
+    pub(crate) level: usize,
 }
+
 impl Entry {
     fn process_op(&mut self, op: &PinOp) -> bool {
         match op {
@@ -76,13 +78,11 @@ impl Entry {
 
 impl LegacyPIC {
     /// Creates a new virtual PIC.
-    pub fn new(hdl: Arc<VmmHdl>) -> Arc<Self> {
-        Arc::new(Self {
-            inner: Mutex::new(Inner {
-                pins: [Entry::default(); PIN_COUNT as usize],
-            }),
-            hdl,
-        })
+    pub(crate) fn new(
+        hdl: Arc<VmmHdl>,
+        inner: Arc<Mutex<Levels>>,
+    ) -> Arc<Self> {
+        Arc::new(Self { inner, hdl })
     }
 
     pub fn pin_handle(self: &Arc<Self>, irq: u8) -> Option<LegacyPin> {

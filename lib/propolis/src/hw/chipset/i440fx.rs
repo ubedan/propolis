@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 
 use crate::common::*;
-use crate::hw::bhyve::BhyvePmTimer;
+use crate::hw::bhyve::{BhyveAtPic, BhyvePmTimer};
 use crate::hw::chipset::Chipset;
 use crate::hw::ibmpc;
 use crate::hw::ids::pci::{
@@ -69,7 +69,8 @@ impl I440Fx {
         log: slog::Logger,
     ) -> Arc<Self> {
         let hdl = machine.hdl.clone();
-        let irq_config = IrqConfig::create(hdl.clone());
+        let irq_config =
+            IrqConfig::create(hdl.clone(), &machine.kernel_devs.atpic);
 
         let power_pin = opts.power_pin.unwrap_or_else(|| Arc::new(NoOpPin {}));
         let reset_pin = opts.reset_pin.unwrap_or_else(|| Arc::new(NoOpPin {}));
@@ -312,8 +313,8 @@ struct IrqConfig {
     sci_pin: Arc<LNKPin>,
 }
 impl IrqConfig {
-    fn create(hdl: Arc<VmmHdl>) -> Arc<Self> {
-        let pic = LegacyPIC::new(hdl);
+    fn create(hdl: Arc<VmmHdl>, atpic: &BhyveAtPic) -> Arc<Self> {
+        let pic = LegacyPIC::new(hdl, atpic.levels().clone());
         let sci_pin = Arc::new(LNKPin::new());
         sci_pin.reassign(pic.pin_handle(SCI_IRQ));
         Arc::new(Self {
@@ -1133,8 +1134,9 @@ mod test {
     fn lpc_pci_cfg_read() {
         let hdl = Arc::new(VmmHdl::new_test(0).unwrap());
         let scaffold = Scaffold::new();
+        let atpic = BhyveAtPic::create(hdl.clone());
 
-        let lpc = Piix3Lpc::create(IrqConfig::create(hdl));
+        let lpc = Piix3Lpc::create(IrqConfig::create(hdl, &atpic));
         let _bus = setup_cfg(&scaffold, lpc.clone());
 
         cfg_read(lpc.as_ref() as &dyn Endpoint);
@@ -1144,8 +1146,9 @@ mod test {
     fn lpc_pci_cfg_write() {
         let hdl = Arc::new(VmmHdl::new_test(0).unwrap());
         let scaffold = Scaffold::new();
+        let atpic = BhyveAtPic::create(hdl.clone());
 
-        let lpc = Piix3Lpc::create(IrqConfig::create(hdl));
+        let lpc = Piix3Lpc::create(IrqConfig::create(hdl, &atpic));
         let _bus = setup_cfg(&scaffold, lpc.clone());
 
         cfg_write(lpc.as_ref() as &dyn Endpoint);

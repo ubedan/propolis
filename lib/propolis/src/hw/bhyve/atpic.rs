@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::inventory::Entity;
 use crate::migrate::*;
@@ -10,10 +10,16 @@ use crate::vmm::VmmHdl;
 
 pub struct BhyveAtPic {
     hdl: Arc<VmmHdl>,
+    levels: Arc<Mutex<crate::intr_pins::Levels>>,
 }
+
 impl BhyveAtPic {
     pub fn create(hdl: Arc<VmmHdl>) -> Arc<Self> {
-        Arc::new(Self { hdl })
+        Arc::new(Self { hdl, levels: Default::default() })
+    }
+
+    pub(crate) fn levels(&self) -> &Arc<Mutex<crate::intr_pins::Levels>> {
+        &self.levels
     }
 }
 
@@ -38,7 +44,19 @@ impl MigrateSingle for BhyveAtPic {
         mut offer: PayloadOffer,
         _ctx: &MigrateCtx,
     ) -> Result<(), MigrateStateError> {
-        offer.parse::<migrate::AtPicV1>()?.write(&self.hdl)?;
+        let state = offer.parse::<migrate::AtPicV1>()?;
+
+        // Synchronize the interrupt pin level counts tracked in userspace by
+        // `LegacyPIC` with the interrupt pin level counts in the imported
+        // payload.
+        let mut levels = self.levels.lock().unwrap();
+        let new_levels =
+            state.chips.iter().flat_map(|chip| chip.level.iter()).copied();
+        for (pin, new_level) in levels.pins.iter_mut().zip(new_levels) {
+            pin.level = new_level as usize;
+        }
+
+        state.write(&self.hdl)?;
         Ok(())
     }
 }
