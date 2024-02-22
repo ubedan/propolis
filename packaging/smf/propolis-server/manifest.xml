@@ -34,6 +34,12 @@
 
   <property_group name='startd' type='framework'>
     <propval name='duration' type='astring' value='contract' />
+    <!--
+      immediately transition the service into maintainance if the
+      `propolis-server` process exits a single time, as VMM crashes
+      are non-recoverable.
+    -->
+    <propval name='critical_failure_count' type='count' value='0'/>
   </property_group>
 
   <stability value='Unstable' />
